@@ -48,8 +48,10 @@
   ];
   const PHASE_COLORS = { A: "#e05252", B: "#4cc2ff", C: "#3fb950" };
   const analogColor = (i, ch) => {
-    if (ch && ch.phase) {
-      const p = ch.phase.trim().toUpperCase()[0];
+    if (ch) {
+      // Try explicit phase field first, then fall back to last char of channel name.
+      const src = (ch.phase && ch.phase.trim()) ? ch.phase.trim() : (ch.name || "");
+      const p = src.toUpperCase().slice(-1);
       if (PHASE_COLORS[p]) return PHASE_COLORS[p];
     }
     return PALETTE[i % PALETTE.length];
