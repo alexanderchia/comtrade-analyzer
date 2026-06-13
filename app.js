@@ -220,8 +220,8 @@
     renderChannelLists(record);
     renderWaveforms();
     renderRmsChart();
-    setupAxisSync();
     renderDigital();
+    setupAxisSync();
     populateFftChannels(record);
     renderFft();
     renderStats(record);
@@ -691,20 +691,18 @@
     const digitalDiv = $("digital-plot");
     const DEBOUNCE   = 150;
 
-    waveDiv.removeAllListeners("plotly_relayout");
-    rmsDiv.removeAllListeners("plotly_relayout");
-    digitalDiv.removeAllListeners("plotly_relayout");
+    const allDivs = [waveDiv, rmsDiv, digitalDiv];
+    allDivs.forEach(d => { if (d.removeAllListeners) d.removeAllListeners("plotly_relayout"); });
 
     function syncOthers(sourceDiv, r) {
       state.xRange = r;
       state.lastSyncMs = Date.now();
-      const others = [waveDiv, rmsDiv, digitalDiv].filter(d => d !== sourceDiv);
-      others.forEach(d => {
-        if (d.data) Plotly.relayout(d, { "xaxis.range[0]": r[0], "xaxis.range[1]": r[1] });
-      });
+      allDivs.filter(d => d !== sourceDiv && d.data)
+        .forEach(d => Plotly.relayout(d, { "xaxis.range[0]": r[0], "xaxis.range[1]": r[1] }));
     }
 
-    [waveDiv, rmsDiv, digitalDiv].forEach(div => {
+    allDivs.forEach(div => {
+      if (!div.on) return;
       div.on("plotly_relayout", data => {
         if (Date.now() - state.lastSyncMs < DEBOUNCE) return;
         const r = axisRangeFrom(data);
