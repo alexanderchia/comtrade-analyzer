@@ -190,6 +190,7 @@
     renderRecordInfo(record);
     renderChannelLists(record);
     renderWaveforms();
+    renderRmsChart();
     renderDigital();
     populateFftChannels(record);
     renderFft();
@@ -233,7 +234,7 @@
   function renderChannelLists(record) {
     buildChannelList($("analog-list"), record.cfg.analogChannels, state.selectedAnalog,
       (i, ch) => `${ch.units || ""}`, i => analogColor(i),
-      () => { renderWaveforms(); });
+      () => { renderWaveforms(); renderRmsChart(); });
     $("analog-panel").classList.toggle("hidden", record.cfg.nAnalog === 0);
 
     buildChannelList($("digital-list"), record.cfg.digitalChannels, state.selectedDigital,
@@ -277,10 +278,14 @@
       .forEach((cb, i) => { cb.checked = selectedSet.has(i); });
     rerender();
   }
-  $("analog-all").addEventListener("click", () =>
-    setAll(state.selectedAnalog, state.record.cfg.nAnalog, true, "analog-list", renderWaveforms));
-  $("analog-none").addEventListener("click", () =>
-    setAll(state.selectedAnalog, state.record.cfg.nAnalog, false, "analog-list", renderWaveforms));
+  $("analog-all").addEventListener("click", () => {
+    setAll(state.selectedAnalog, state.record.cfg.nAnalog, true, "analog-list", renderWaveforms);
+    renderRmsChart();
+  });
+  $("analog-none").addEventListener("click", () => {
+    setAll(state.selectedAnalog, state.record.cfg.nAnalog, false, "analog-list", renderWaveforms);
+    renderRmsChart();
+  });
   $("digital-all").addEventListener("click", () =>
     setAll(state.selectedDigital, state.record.cfg.nDigital, true, "digital-list", renderDigital));
   $("digital-none").addEventListener("click", () =>
@@ -374,6 +379,41 @@
   }
 
   $("per-unit-toggle").addEventListener("change", renderWaveforms);
+
+  /* ---------------- RMS bar chart ---------------- */
+
+  function renderRmsChart() {
+    const record = state.record;
+    if (!record) return;
+    const div = $("rms-plot");
+    const idxs = [...state.selectedAnalog].sort((a, b) => a - b)
+      .filter(i => i < record.cfg.nAnalog);
+
+    $("rms-empty").classList.toggle("hidden", idxs.length > 0);
+    if (idxs.length === 0) { Plotly.purge(div); div.innerHTML = ""; return; }
+
+    const labels = idxs.map(i => {
+      const ch = record.cfg.analogChannels[i];
+      return ch.name + (ch.phase ? ` (${ch.phase})` : "");
+    });
+    const values = idxs.map(i => Comtrade.channelStats(record.analog[i], record.time).rms);
+    const units  = idxs.map(i => record.cfg.analogChannels[i].units || "");
+    const colors = idxs.map(i => analogColor(i));
+
+    Plotly.react(div, [{
+      x: labels,
+      y: values,
+      type: "bar",
+      marker: { color: colors },
+      hovertemplate: "%{x}<br>RMS: %{y:.5g} %{customdata}<extra></extra>",
+      customdata: units
+    }], darkLayout({
+      xaxis: Object.assign(darkLayout().xaxis, { tickangle: -30 }),
+      yaxis: Object.assign(darkLayout().yaxis, { title: { text: "RMS Value" } }),
+      showlegend: false,
+      bargap: 0.3
+    }), PLOT_CONFIG);
+  }
 
   /* ---------------- digital plot ---------------- */
 
