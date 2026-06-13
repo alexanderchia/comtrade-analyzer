@@ -46,7 +46,7 @@
     "#ff7ab8", "#56d4dd", "#f0883e", "#7ee787", "#a5d6ff",
     "#ffa198", "#d2a8ff", "#79c0ff", "#ffdf5d", "#56d364"
   ];
-  const PHASE_COLORS = { A: "#e05252", B: "#3fb950", C: "#4cc2ff" };
+  const PHASE_COLORS = { A: "#e05252", B: "#4cc2ff", C: "#3fb950" };
   const analogColor = (i, ch) => {
     if (ch && ch.phase) {
       const p = ch.phase.trim().toUpperCase();
