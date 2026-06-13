@@ -380,7 +380,23 @@
 
   $("per-unit-toggle").addEventListener("change", renderWaveforms);
 
-  /* ---------------- RMS bar chart ---------------- */
+  /* ---------------- 1-cycle RMS vs time ---------------- */
+
+  function oneCycleRms(values, sampleRate, lineFreq) {
+    const N = Math.round(sampleRate / lineFreq);
+    if (N < 2 || values.length < N) return null;
+    const rms = new Float64Array(values.length - N + 1);
+    // Compute first window sum-of-squares
+    let ss = 0;
+    for (let i = 0; i < N; i++) ss += values[i] * values[i];
+    rms[0] = Math.sqrt(ss / N);
+    // Slide the window
+    for (let i = 1; i < rms.length; i++) {
+      ss += values[i + N - 1] * values[i + N - 1] - values[i - 1] * values[i - 1];
+      rms[i] = Math.sqrt(Math.max(0, ss) / N);
+    }
+    return rms;
+  }
 
   function renderRmsChart() {
     const record = state.record;
@@ -392,26 +408,35 @@
     $("rms-empty").classList.toggle("hidden", idxs.length > 0);
     if (idxs.length === 0) { Plotly.purge(div); div.innerHTML = ""; return; }
 
-    const labels = idxs.map(i => {
-      const ch = record.cfg.analogChannels[i];
-      return ch.name + (ch.phase ? ` (${ch.phase})` : "");
-    });
-    const values = idxs.map(i => Comtrade.channelStats(record.analog[i], record.time).rms);
-    const units  = idxs.map(i => record.cfg.analogChannels[i].units || "");
-    const colors = idxs.map(i => analogColor(i));
+    const lineFreq = record.cfg.lineFrequency || 60;
+    const N = Math.round(record.sampleRate / lineFreq);
+    // Time axis starts half a cycle in (centre of first window)
+    const timeRms = Array.from(record.time.slice(N - 1));
 
-    Plotly.react(div, [{
-      x: labels,
-      y: values,
-      type: "bar",
-      marker: { color: colors },
-      hovertemplate: "%{x}<br>RMS: %{y:.5g} %{customdata}<extra></extra>",
-      customdata: units
-    }], darkLayout({
-      xaxis: Object.assign(darkLayout().xaxis, { tickangle: -30 }),
-      yaxis: Object.assign(darkLayout().yaxis, { title: { text: "RMS Value" } }),
-      showlegend: false,
-      bargap: 0.3
+    const traces = idxs.map(i => {
+      const ch = record.cfg.analogChannels[i];
+      const rms = oneCycleRms(record.analog[i], record.sampleRate, lineFreq);
+      if (!rms) return null;
+      const d = decimate(timeRms, rms, MAX_PLOT_POINTS);
+      return {
+        x: d.x, y: d.y,
+        type: "scatter", mode: "lines",
+        name: ch.name + (ch.phase ? ` (${ch.phase})` : "") + (ch.units ? ` [${ch.units}]` : ""),
+        line: { color: analogColor(i), width: 1.4 },
+        hovertemplate: "%{y:.5g}" + (ch.units ? " " + ch.units : "") +
+                       "<extra>" + escapeHtml(ch.name) + "</extra>"
+      };
+    }).filter(Boolean);
+
+    if (!traces.length) { Plotly.purge(div); div.innerHTML = ""; return; }
+
+    const units = new Set(idxs.map(i => record.cfg.analogChannels[i].units).filter(Boolean));
+    const yTitle = units.size === 1 ? `RMS [${[...units][0]}]` : "RMS (mixed units)";
+
+    Plotly.react(div, traces, darkLayout({
+      xaxis: Object.assign(darkLayout().xaxis, { title: { text: "Time (s)" } }),
+      yaxis: Object.assign(darkLayout().yaxis, { title: { text: yTitle } }),
+      legend: { orientation: "h", y: 1.12, font: { color: "#c8d2dc" } }
     }), PLOT_CONFIG);
   }
 
