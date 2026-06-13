@@ -194,6 +194,7 @@
     renderChannelLists(record);
     renderWaveforms();
     renderRmsChart();
+    setupAxisSync();
     renderDigital();
     populateFftChannels(record);
     renderFft();
@@ -380,16 +381,6 @@
       xaxis: Object.assign(darkLayout().xaxis, { title: { text: "Time (s)" }, range: xRange }),
       yaxis: Object.assign(darkLayout().yaxis, { title: { text: yTitle } })
     }), PLOT_CONFIG);
-
-    div.on("plotly_relayout", data => {
-      if (state.syncingAxes) return;
-      const r = axisRangeFrom(data);
-      if (!r) return;
-      state.xRange = r;
-      state.syncingAxes = true;
-      Plotly.relayout($("rms-plot"), { "xaxis.range[0]": r[0], "xaxis.range[1]": r[1] });
-      state.syncingAxes = false;
-    });
   }
 
   $("per-unit-toggle").addEventListener("change", renderWaveforms);
@@ -453,16 +444,6 @@
       yaxis: Object.assign(darkLayout().yaxis, { title: { text: yTitle } }),
       legend: { orientation: "h", y: 1.12, font: { color: "#c8d2dc" } }
     }), PLOT_CONFIG);
-
-    div.on("plotly_relayout", data => {
-      if (state.syncingAxes) return;
-      const r = axisRangeFrom(data);
-      if (!r) return;
-      state.xRange = r;
-      state.syncingAxes = true;
-      Plotly.relayout($("waveform-plot"), { "xaxis.range[0]": r[0], "xaxis.range[1]": r[1] });
-      state.syncingAxes = false;
-    });
   }
 
   /* ---------------- digital plot ---------------- */
@@ -633,15 +614,42 @@
     });
   }
 
-  /* ---------------- axis sync helper ---------------- */
+  /* ---------------- axis sync ---------------- */
 
   function axisRangeFrom(data) {
     if (data["xaxis.range[0]"] !== undefined && data["xaxis.range[1]"] !== undefined)
       return [data["xaxis.range[0]"], data["xaxis.range[1]"]];
     if (data["xaxis.range"] && data["xaxis.range"].length === 2)
       return data["xaxis.range"];
-    if (data["xaxis.autorange"]) return null; // zoom reset — let both auto-range
     return null;
+  }
+
+  function setupAxisSync() {
+    const waveDiv = $("waveform-plot");
+    const rmsDiv  = $("rms-plot");
+
+    waveDiv.removeAllListeners("plotly_relayout");
+    rmsDiv.removeAllListeners("plotly_relayout");
+
+    waveDiv.on("plotly_relayout", data => {
+      if (state.syncingAxes) return;
+      const r = axisRangeFrom(data);
+      if (!r) return;
+      state.xRange = r;
+      state.syncingAxes = true;
+      Plotly.relayout(rmsDiv, { "xaxis.range[0]": r[0], "xaxis.range[1]": r[1] });
+      state.syncingAxes = false;
+    });
+
+    rmsDiv.on("plotly_relayout", data => {
+      if (state.syncingAxes) return;
+      const r = axisRangeFrom(data);
+      if (!r) return;
+      state.xRange = r;
+      state.syncingAxes = true;
+      Plotly.relayout(waveDiv, { "xaxis.range[0]": r[0], "xaxis.range[1]": r[1] });
+      state.syncingAxes = false;
+    });
   }
 
   /* ---------------- utilities ---------------- */
