@@ -17,7 +17,8 @@
     selectedDigital: new Set(),
     xRange: null,       // shared x-axis range [min, max] for waveform + RMS plots
     lastSyncMs: 0,      // timestamp of last axis sync, debounces relayout feedback loops
-    xInCycles: false    // when true, time-domain x-axes are shown in cycles instead of seconds
+    xInCycles: false,   // when true, time-domain x-axes are shown in cycles instead of seconds
+    showPoints: false   // when true, time-series traces also render markers at sampled points
   };
 
   /* ---------------- x-axis units ---------------- */
@@ -197,6 +198,8 @@
     state.record = record;
     state.xRange = null;
     state.xInCycles = false;
+    state.showPoints = false;
+    $("show-points-toggle").checked = false;
     updateCyclesButton();
     state.selectedAnalog = new Set(
       record.analog.map((_, i) => i).slice(0, record.cfg.nAnalog <= 6 ? 6 : 4));
@@ -387,9 +390,10 @@
       const d = decimate(record.time, values, MAX_PLOT_POINTS);
       return {
         x: toDisplayX(d.x), y: d.y,
-        type: "scatter", mode: "lines",
+        type: "scatter", mode: state.showPoints ? "lines+markers" : "lines",
         name: ch.name + (ch.units && !perUnit ? ` [${ch.units}]` : ""),
         line: { color: analogColor(i), width: 1.4 },
+        marker: { size: 3 },
         hovertemplate: "%{y:.4g}" + (perUnit ? " pu" : (ch.units ? " " + ch.units : "")) +
                        "<extra>" + escapeHtml(ch.name) + "</extra>"
       };
@@ -408,6 +412,13 @@
   }
 
   $("per-unit-toggle").addEventListener("change", renderWaveforms);
+
+  $("show-points-toggle").addEventListener("change", function () {
+    state.showPoints = this.checked;
+    renderWaveforms();
+    renderRmsChart();
+    renderDigital();
+  });
 
   /* ---------------- seconds / cycles toggle ---------------- */
 
@@ -471,9 +482,10 @@
       const d = decimate(timeRms, rms, MAX_PLOT_POINTS);
       return {
         x: toDisplayX(d.x), y: d.y,
-        type: "scatter", mode: "lines",
+        type: "scatter", mode: state.showPoints ? "lines+markers" : "lines",
         name: ch.name + (ch.phase ? ` (${ch.phase})` : "") + (ch.units ? ` [${ch.units}]` : ""),
         line: { color: analogColor(i), width: 1.4 },
+        marker: { size: 3 },
         hovertemplate: "%{y:.5g}" + (ch.units ? " " + ch.units : "") +
                        "<extra>" + escapeHtml(ch.name) + "</extra>"
       };
@@ -534,9 +546,10 @@
 
       traces.push({
         x: toDisplayX(xs), y: ys,
-        type: "scatter", mode: "lines",
+        type: "scatter", mode: state.showPoints ? "lines+markers" : "lines",
         name: ch.name,
         line: { color: PALETTE[(chIdx + 2) % PALETTE.length], width: 1.8, shape: "linear" },
+        marker: { size: 3 },
         hovertemplate: "%{customdata}<extra>" + escapeHtml(ch.name) + "</extra>",
         customdata: ys.map(y => (y - offset) >= 0.5 ? "ON (1)" : "OFF (0)"),
         showlegend: false
