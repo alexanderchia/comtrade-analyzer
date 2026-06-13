@@ -49,7 +49,7 @@
   const PHASE_COLORS = { A: "#e05252", B: "#4cc2ff", C: "#3fb950" };
   const analogColor = (i, ch) => {
     if (ch && ch.phase) {
-      const p = ch.phase.trim().toUpperCase();
+      const p = ch.phase.trim().toUpperCase()[0];
       if (PHASE_COLORS[p]) return PHASE_COLORS[p];
     }
     return PALETTE[i % PALETTE.length];
