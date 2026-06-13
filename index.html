@@ -100,23 +100,35 @@
 
     <div id="results" class="hidden">
 
-      <section class="card">
+      <section class="card" id="voltage-waveform-card">
         <div class="card-head">
-          <h2>Analog Waveforms</h2>
+          <h2>Voltage Waveforms</h2>
           <div class="card-head-controls">
             <button id="cycles-toggle" class="btn toggle-btn" type="button">View in Cycles</button>
             <label class="toggle"><input type="checkbox" id="per-unit-toggle"> Normalize (per max)</label>
             <label class="toggle"><input type="checkbox" id="show-points-toggle"> Show data points</label>
           </div>
         </div>
-        <div id="waveform-plot" class="plot tall"></div>
-        <p id="waveform-empty" class="empty-hint hidden">Select one or more analog channels in the sidebar.</p>
+        <div id="voltage-waveform-plot" class="plot tall"></div>
+        <p id="voltage-waveform-empty" class="empty-hint hidden">No voltage channels selected.</p>
       </section>
 
-      <section class="card">
-        <div class="card-head"><h2>1-Cycle RMS vs Time</h2></div>
-        <div id="rms-plot" class="plot"></div>
-        <p id="rms-empty" class="empty-hint hidden">Select one or more analog channels in the sidebar.</p>
+      <section class="card" id="voltage-rms-card">
+        <div class="card-head"><h2>Voltage 1-Cycle RMS vs Time</h2></div>
+        <div id="voltage-rms-plot" class="plot"></div>
+        <p id="voltage-rms-empty" class="empty-hint hidden">No voltage channels selected.</p>
+      </section>
+
+      <section class="card" id="current-waveform-card">
+        <div class="card-head"><h2>Current Waveforms</h2></div>
+        <div id="current-waveform-plot" class="plot tall"></div>
+        <p id="current-waveform-empty" class="empty-hint hidden">No current channels selected.</p>
+      </section>
+
+      <section class="card" id="current-rms-card">
+        <div class="card-head"><h2>Current 1-Cycle RMS vs Time</h2></div>
+        <div id="current-rms-plot" class="plot"></div>
+        <p id="current-rms-empty" class="empty-hint hidden">No current channels selected.</p>
       </section>
 
       <section class="card" id="digital-card">

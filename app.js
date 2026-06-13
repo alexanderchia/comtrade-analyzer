@@ -57,6 +57,66 @@
 
   const MAX_PLOT_POINTS = 8000; // per analog trace, min/max decimated
 
+  /* ---------------- channel classification ---------------- */
+
+  // Classify an analog channel as "voltage" or "current" by its units field.
+  function channelType(ch) {
+    const u = (ch.units || "").toLowerCase().trim();
+    if (/[kmµ]?v$/.test(u) || u === "v") return "voltage";
+    if (/[kmµ]?a$/.test(u) || u === "a") return "current";
+    return "voltage"; // fallback
+  }
+
+  // Split the currently selected analog indices into voltage and current groups.
+  // Falls back to index halves when units are absent/unrecognized for all channels.
+  function splitSelectedAnalog() {
+    const record = state.record;
+    if (!record) return { voltageIdxs: [], currentIdxs: [] };
+    const channels = record.cfg.analogChannels;
+    const idxs = [...state.selectedAnalog].sort((a, b) => a - b)
+      .filter(i => i < record.cfg.nAnalog);
+
+    // Detect whether any channel has a recognizable unit; if none do, use index split.
+    const anyRecognized = channels.some(ch => {
+      const u = (ch.units || "").toLowerCase().trim();
+      return /[kmµ]?v$/.test(u) || u === "v" || /[kmµ]?a$/.test(u) || u === "a";
+    });
+
+    const voltageIdxs = [], currentIdxs = [];
+    if (anyRecognized) {
+      for (const i of idxs) {
+        if (channelType(channels[i]) === "current") currentIdxs.push(i);
+        else voltageIdxs.push(i);
+      }
+    } else {
+      const half = Math.ceil(record.cfg.nAnalog / 2);
+      for (const i of idxs) {
+        if (i < half) voltageIdxs.push(i); else currentIdxs.push(i);
+      }
+    }
+    return { voltageIdxs, currentIdxs };
+  }
+
+  // Indices (regardless of selection) of voltage/current channels — used to
+  // decide which cards to show in presentRecord.
+  function typedChannelCounts(record) {
+    const channels = record.cfg.analogChannels;
+    const anyRecognized = channels.some(ch => {
+      const u = (ch.units || "").toLowerCase().trim();
+      return /[kmµ]?v$/.test(u) || u === "v" || /[kmµ]?a$/.test(u) || u === "a";
+    });
+    let voltage = 0, current = 0;
+    if (anyRecognized) {
+      channels.forEach(ch => {
+        if (channelType(ch) === "current") current++; else voltage++;
+      });
+    } else {
+      const half = Math.ceil(channels.length / 2);
+      channels.forEach((_, i) => { if (i < half) voltage++; else current++; });
+    }
+    return { voltage, current };
+  }
+
   /* ---------------- DOM ---------------- */
 
   const $ = id => document.getElementById(id);
@@ -225,8 +285,18 @@
 
     renderRecordInfo(record);
     renderChannelLists(record);
+
+    // Show/hide the voltage and current cards based on which channel types exist.
+    const counts = typedChannelCounts(record);
+    const hasVoltage = counts.voltage > 0;
+    const hasCurrent = counts.current > 0;
+    $("voltage-waveform-card").classList.toggle("hidden", !hasVoltage);
+    $("voltage-rms-card").classList.toggle("hidden", !hasVoltage);
+    $("current-waveform-card").classList.toggle("hidden", !hasCurrent);
+    $("current-rms-card").classList.toggle("hidden", !hasCurrent);
+
     renderWaveforms();
-    renderRmsChart();
+    renderRmsCharts();
     renderDigital();
     setupAxisSync();
     populateFftChannels(record);
@@ -271,7 +341,7 @@
   function renderChannelLists(record) {
     buildChannelList($("analog-list"), record.cfg.analogChannels, state.selectedAnalog,
       (i, ch) => `${ch.units || ""}`, (i, ch) => analogColor(i, ch),
-      () => { renderWaveforms(); renderRmsChart(); });
+      () => { renderWaveforms(); renderRmsCharts(); });
     $("analog-panel").classList.toggle("hidden", record.cfg.nAnalog === 0);
 
     buildChannelList($("digital-list"), record.cfg.digitalChannels, state.selectedDigital,
@@ -317,11 +387,11 @@
   }
   $("analog-all").addEventListener("click", () => {
     setAll(state.selectedAnalog, state.record.cfg.nAnalog, true, "analog-list", renderWaveforms);
-    renderRmsChart();
+    renderRmsCharts();
   });
   $("analog-none").addEventListener("click", () => {
     setAll(state.selectedAnalog, state.record.cfg.nAnalog, false, "analog-list", renderWaveforms);
-    renderRmsChart();
+    renderRmsCharts();
   });
   $("digital-all").addEventListener("click", () =>
     setAll(state.selectedDigital, state.record.cfg.nDigital, true, "digital-list", renderDigital));
@@ -373,14 +443,13 @@
 
   /* ---------------- waveform plot ---------------- */
 
-  function renderWaveforms() {
+  function renderWaveformChart(plotDivId, emptyHintId, channelIdxs) {
     const record = state.record;
     if (!record) return;
-    const div = $("waveform-plot");
-    const idxs = [...state.selectedAnalog].sort((a, b) => a - b)
-      .filter(i => i < record.cfg.nAnalog);
+    const div = $(plotDivId);
+    const idxs = channelIdxs;
 
-    $("waveform-empty").classList.toggle("hidden", idxs.length > 0);
+    $(emptyHintId).classList.toggle("hidden", idxs.length > 0);
     if (idxs.length === 0) { Plotly.purge(div); div.innerHTML = ""; return; }
 
     const perUnit = $("per-unit-toggle").checked;
@@ -418,12 +487,19 @@
     }), PLOT_CONFIG);
   }
 
+  // Wrapper: split current selection into voltage/current and render both charts.
+  function renderWaveforms() {
+    const { voltageIdxs, currentIdxs } = splitSelectedAnalog();
+    renderWaveformChart("voltage-waveform-plot", "voltage-waveform-empty", voltageIdxs);
+    renderWaveformChart("current-waveform-plot", "current-waveform-empty", currentIdxs);
+  }
+
   $("per-unit-toggle").addEventListener("change", renderWaveforms);
 
   $("show-points-toggle").addEventListener("change", function () {
     state.showPoints = this.checked;
     renderWaveforms();
-    renderRmsChart();
+    renderRmsCharts();
     renderDigital();
   });
 
@@ -445,7 +521,7 @@
     state.xInCycles = !state.xInCycles;
     updateCyclesButton();
     renderWaveforms();
-    renderRmsChart();
+    renderRmsCharts();
     renderDigital();
   });
 
@@ -467,14 +543,13 @@
     return rms;
   }
 
-  function renderRmsChart() {
+  function renderRmsChartFor(plotDivId, emptyHintId, channelIdxs) {
     const record = state.record;
     if (!record) return;
-    const div = $("rms-plot");
-    const idxs = [...state.selectedAnalog].sort((a, b) => a - b)
-      .filter(i => i < record.cfg.nAnalog);
+    const div = $(plotDivId);
+    const idxs = channelIdxs;
 
-    $("rms-empty").classList.toggle("hidden", idxs.length > 0);
+    $(emptyHintId).classList.toggle("hidden", idxs.length > 0);
     if (idxs.length === 0) { Plotly.purge(div); div.innerHTML = ""; return; }
 
     const lineFreq = record.cfg.lineFrequency || 60;
@@ -510,6 +585,13 @@
       yaxis: Object.assign(darkLayout().yaxis, { title: { text: yTitle } }),
       legend: { orientation: "h", y: 1.12, font: { color: "#c8d2dc" } }
     }), PLOT_CONFIG);
+  }
+
+  // Wrapper: split current selection into voltage/current and render both RMS charts.
+  function renderRmsCharts() {
+    const { voltageIdxs, currentIdxs } = splitSelectedAnalog();
+    renderRmsChartFor("voltage-rms-plot", "voltage-rms-empty", voltageIdxs);
+    renderRmsChartFor("current-rms-plot", "current-rms-empty", currentIdxs);
   }
 
   /* ---------------- digital plot ---------------- */
@@ -693,12 +775,15 @@
   }
 
   function setupAxisSync() {
-    const waveDiv    = $("waveform-plot");
-    const rmsDiv     = $("rms-plot");
-    const digitalDiv = $("digital-plot");
-    const DEBOUNCE   = 150;
+    const DEBOUNCE = 150;
 
-    const allDivs = [waveDiv, rmsDiv, digitalDiv];
+    const allDivs = [
+      $("voltage-waveform-plot"),
+      $("voltage-rms-plot"),
+      $("current-waveform-plot"),
+      $("current-rms-plot"),
+      $("digital-plot")
+    ];
     allDivs.forEach(d => { if (d.removeAllListeners) d.removeAllListeners("plotly_relayout"); });
 
     function syncOthers(sourceDiv, r) {
