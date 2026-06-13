@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Comtrade Analyzer</title>
+<link rel="stylesheet" href="style.css">
+<script src="plotly-2.26.0.min.js" charset="utf-8"></script>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <svg class="brand-icon" viewBox="0 0 32 32" width="26" height="26" aria-hidden="true">
+      <polyline points="1,16 6,16 9,5 14,27 19,9 22,21 25,16 31,16"
+                fill="none" stroke="currentColor" stroke-width="2.5"
+                stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <h1>Comtrade Analyzer</h1>
+  </div>
+  <div class="header-meta">
+    <span id="record-badge" class="badge hidden"></span>
+    <span class="privacy-note">100% local &mdash; files never leave your machine</span>
+  </div>
+</header>
+
+<div id="error-banner" class="error-banner hidden">
+  <span id="error-text"></span>
+  <button id="error-close" title="Dismiss" aria-label="Dismiss error">&times;</button>
+</div>
+
+<div class="layout">
+
+  <!-- ======================= SIDEBAR ======================= -->
+  <aside class="sidebar">
+
+    <section class="panel">
+      <h2>Load Record</h2>
+      <div id="drop-zone" class="drop-zone" tabindex="0">
+        <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true">
+          <path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+                d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 16.5V19a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 19v-2.5"/>
+        </svg>
+        <p>Drag &amp; drop your <strong>.cfg</strong> and <strong>.dat</strong> files here</p>
+        <p class="muted">or</p>
+        <button id="browse-btn" class="btn primary" type="button">Browse files&hellip;</button>
+        <input id="file-input" type="file" multiple accept=".cfg,.dat,.CFG,.DAT" class="hidden">
+      </div>
+      <div class="file-slots">
+        <div class="file-slot" id="slot-cfg">
+          <span class="slot-label">CFG</span>
+          <span class="slot-name" id="slot-cfg-name">waiting&hellip;</span>
+        </div>
+        <div class="file-slot" id="slot-dat">
+          <span class="slot-label">DAT</span>
+          <span class="slot-name" id="slot-dat-name">waiting&hellip;</span>
+        </div>
+      </div>
+      <button id="demo-btn" class="btn ghost full" type="button">Load demo record (synthetic fault)</button>
+    </section>
+
+    <section class="panel hidden" id="record-info-panel">
+      <h2>Record Info</h2>
+      <table class="info-table" id="record-info"></table>
+    </section>
+
+    <section class="panel hidden" id="analog-panel">
+      <div class="panel-head">
+        <h2>Analog Channels</h2>
+        <div class="mini-actions">
+          <button class="btn tiny" id="analog-all" type="button">All</button>
+          <button class="btn tiny" id="analog-none" type="button">None</button>
+        </div>
+      </div>
+      <ul class="channel-list" id="analog-list"></ul>
+    </section>
+
+    <section class="panel hidden" id="digital-panel">
+      <div class="panel-head">
+        <h2>Digital Channels</h2>
+        <div class="mini-actions">
+          <button class="btn tiny" id="digital-all" type="button">All</button>
+          <button class="btn tiny" id="digital-none" type="button">None</button>
+        </div>
+      </div>
+      <ul class="channel-list" id="digital-list"></ul>
+    </section>
+
+  </aside>
+
+  <!-- ======================= MAIN ======================= -->
+  <main class="main">
+
+    <div id="welcome" class="welcome">
+      <h2>No record loaded</h2>
+      <p>Load a Comtrade <code>.cfg</code> + <code>.dat</code> pair to begin.<br>
+         Supported revisions: <strong>1991</strong>, <strong>1999</strong>, <strong>2013</strong>
+         &mdash; ASCII and BINARY data formats.</p>
+    </div>
+
+    <div id="results" class="hidden">
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Analog Waveforms</h2>
+          <label class="toggle"><input type="checkbox" id="per-unit-toggle"> Normalize (per max)</label>
+        </div>
+        <div id="waveform-plot" class="plot tall"></div>
+        <p id="waveform-empty" class="empty-hint hidden">Select one or more analog channels in the sidebar.</p>
+      </section>
+
+      <section class="card" id="digital-card">
+        <div class="card-head"><h2>Digital / Status Channels</h2></div>
+        <div id="digital-plot" class="plot"></div>
+        <p id="digital-empty" class="empty-hint hidden">Select one or more digital channels in the sidebar.</p>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h2>Frequency Spectrum (FFT)</h2>
+          <div class="fft-controls">
+            <select id="fft-channel" aria-label="FFT channel"></select>
+            <label class="toggle"><input type="checkbox" id="fft-log"> Log magnitude</label>
+            <label class="toggle"><input type="checkbox" id="fft-zoom" checked> Limit to 1&nbsp;kHz</label>
+          </div>
+        </div>
+        <div id="fft-plot" class="plot"></div>
+        <p id="fft-note" class="muted small"></p>
+      </section>
+
+      <section class="card">
+        <div class="card-head"><h2>Channel Statistics</h2></div>
+        <div class="table-wrap">
+          <table class="stats-table" id="stats-table">
+            <thead>
+              <tr>
+                <th>#</th><th>Channel</th><th>Phase</th><th>Units</th>
+                <th>RMS</th><th>Peak (|max|)</th><th>Min</th><th>Max</th>
+                <th>Mean</th><th>Est. freq (Hz)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+  </main>
+</div>
+
+<script src="fft.js"></script>
+<script src="comtrade.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
