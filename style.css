@@ -257,6 +257,21 @@ html, body {
 
 .mini-actions { display: flex; gap: 0.3rem; }
 
+.card-head-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.btn.toggle-btn {
+  font-size: 0.78rem;
+  padding: 0.28rem 0.7rem;
+  color: var(--text-dim);
+  background: transparent;
+}
+.btn.toggle-btn:hover { color: var(--text); border-color: var(--accent); }
+
 /* ---------------- Info table ---------------- */
 
 .info-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }

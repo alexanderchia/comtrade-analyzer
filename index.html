@@ -103,7 +103,10 @@
       <section class="card">
         <div class="card-head">
           <h2>Analog Waveforms</h2>
-          <label class="toggle"><input type="checkbox" id="per-unit-toggle"> Normalize (per max)</label>
+          <div class="card-head-controls">
+            <button id="cycles-toggle" class="btn toggle-btn" type="button">View in Cycles</button>
+            <label class="toggle"><input type="checkbox" id="per-unit-toggle"> Normalize (per max)</label>
+          </div>
         </div>
         <div id="waveform-plot" class="plot tall"></div>
         <p id="waveform-empty" class="empty-hint hidden">Select one or more analog channels in the sidebar.</p>

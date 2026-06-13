@@ -16,8 +16,29 @@
     selectedAnalog: new Set(),
     selectedDigital: new Set(),
     xRange: null,       // shared x-axis range [min, max] for waveform + RMS plots
-    lastSyncMs: 0       // timestamp of last axis sync, debounces relayout feedback loops
+    lastSyncMs: 0,      // timestamp of last axis sync, debounces relayout feedback loops
+    xInCycles: false    // when true, time-domain x-axes are shown in cycles instead of seconds
   };
+
+  /* ---------------- x-axis units ---------------- */
+
+  // Line frequency used to convert seconds <-> cycles (50/60 Hz, fallback 60).
+  function lineFreq() {
+    return (state.record && state.record.cfg.lineFrequency) || 60;
+  }
+
+  // Map an array of times (in seconds) to display units (seconds or cycles).
+  function toDisplayX(timeArr) {
+    if (!state.xInCycles) return timeArr;
+    const f = lineFreq();
+    const out = new Array(timeArr.length);
+    for (let i = 0; i < timeArr.length; i++) out[i] = timeArr[i] * f;
+    return out;
+  }
+
+  function xAxisLabel() {
+    return state.xInCycles ? "Cycles" : "Time (s)";
+  }
 
   const PALETTE = [
     "#4cc2ff", "#ff7a5c", "#3fb950", "#e3b341", "#bc8cff",
@@ -175,6 +196,8 @@
     }
     state.record = record;
     state.xRange = null;
+    state.xInCycles = false;
+    updateCyclesButton();
     state.selectedAnalog = new Set(
       record.analog.map((_, i) => i).slice(0, record.cfg.nAnalog <= 6 ? 6 : 4));
     state.selectedDigital = new Set(
@@ -363,7 +386,7 @@
       }
       const d = decimate(record.time, values, MAX_PLOT_POINTS);
       return {
-        x: d.x, y: d.y,
+        x: toDisplayX(d.x), y: d.y,
         type: "scatter", mode: "lines",
         name: ch.name + (ch.units && !perUnit ? ` [${ch.units}]` : ""),
         line: { color: analogColor(i), width: 1.4 },
@@ -376,14 +399,37 @@
     const yTitle = perUnit ? "Normalized amplitude"
                  : (units.size === 1 ? [...units][0] : "Value (mixed units)");
 
-    const xRange = state.xRange || [record.time[0], record.time[record.count - 1]];
+    const xRange = state.xRange ||
+      toDisplayX([record.time[0], record.time[record.count - 1]]);
     Plotly.react(div, traces, darkLayout({
-      xaxis: Object.assign(darkLayout().xaxis, { title: { text: "Time (s)" }, range: xRange }),
+      xaxis: Object.assign(darkLayout().xaxis, { title: { text: xAxisLabel() }, range: xRange }),
       yaxis: Object.assign(darkLayout().yaxis, { title: { text: yTitle } })
     }), PLOT_CONFIG);
   }
 
   $("per-unit-toggle").addEventListener("change", renderWaveforms);
+
+  /* ---------------- seconds / cycles toggle ---------------- */
+
+  function updateCyclesButton() {
+    $("cycles-toggle").textContent = state.xInCycles ? "View in Seconds" : "View in Cycles";
+  }
+
+  $("cycles-toggle").addEventListener("click", () => {
+    if (!state.record) return;
+    const f = lineFreq();
+    // Switching units: convert the stored shared range so the view stays put.
+    if (state.xRange) {
+      state.xRange = state.xInCycles
+        ? [state.xRange[0] / f, state.xRange[1] / f]   // cycles -> seconds
+        : [state.xRange[0] * f, state.xRange[1] * f];  // seconds -> cycles
+    }
+    state.xInCycles = !state.xInCycles;
+    updateCyclesButton();
+    renderWaveforms();
+    renderRmsChart();
+    renderDigital();
+  });
 
   /* ---------------- 1-cycle RMS vs time ---------------- */
 
@@ -424,7 +470,7 @@
       if (!rms) return null;
       const d = decimate(timeRms, rms, MAX_PLOT_POINTS);
       return {
-        x: d.x, y: d.y,
+        x: toDisplayX(d.x), y: d.y,
         type: "scatter", mode: "lines",
         name: ch.name + (ch.phase ? ` (${ch.phase})` : "") + (ch.units ? ` [${ch.units}]` : ""),
         line: { color: analogColor(i), width: 1.4 },
@@ -438,9 +484,10 @@
     const units = new Set(idxs.map(i => record.cfg.analogChannels[i].units).filter(Boolean));
     const yTitle = units.size === 1 ? `RMS [${[...units][0]}]` : "RMS (mixed units)";
 
-    const xRange = state.xRange || [record.time[0], record.time[record.count - 1]];
+    const xRange = state.xRange ||
+      toDisplayX([record.time[0], record.time[record.count - 1]]);
     Plotly.react(div, traces, darkLayout({
-      xaxis: Object.assign(darkLayout().xaxis, { title: { text: "Time (s)" }, range: xRange }),
+      xaxis: Object.assign(darkLayout().xaxis, { title: { text: xAxisLabel() }, range: xRange }),
       yaxis: Object.assign(darkLayout().yaxis, { title: { text: yTitle } }),
       legend: { orientation: "h", y: 1.12, font: { color: "#c8d2dc" } }
     }), PLOT_CONFIG);
@@ -486,7 +533,7 @@
       xs.push(time[last]); ys.push(offset + v[last]);
 
       traces.push({
-        x: xs, y: ys,
+        x: toDisplayX(xs), y: ys,
         type: "scatter", mode: "lines",
         name: ch.name,
         line: { color: PALETTE[(chIdx + 2) % PALETTE.length], width: 1.8, shape: "linear" },
@@ -497,7 +544,7 @@
     });
 
     Plotly.react(div, traces, darkLayout({
-      xaxis: Object.assign(darkLayout().xaxis, { title: { text: "Time (s)" } }),
+      xaxis: Object.assign(darkLayout().xaxis, { title: { text: xAxisLabel() } }),
       yaxis: Object.assign(darkLayout().yaxis, {
         tickvals: tickVals, ticktext: tickText,
         range: [-0.6, (idxs.length - 1) * 1.6 + 1.6],
