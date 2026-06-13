@@ -62,8 +62,8 @@
   // Classify an analog channel as "voltage" or "current" by its units field.
   function channelType(ch) {
     const u = (ch.units || "").toLowerCase().trim();
-    if (/[kmµ]?v$/.test(u) || u === "v") return "voltage";
-    if (/[kmµ]?a$/.test(u) || u === "a") return "current";
+    if (/[kmµ]?v$/.test(u)) return "voltage";
+    if (/[kmµ]?a$/.test(u) || /[kmµ]?i$/.test(u)) return "current";
     return "voltage"; // fallback
   }
 
@@ -79,7 +79,7 @@
     // Detect whether any channel has a recognizable unit; if none do, use index split.
     const anyRecognized = channels.some(ch => {
       const u = (ch.units || "").toLowerCase().trim();
-      return /[kmµ]?v$/.test(u) || u === "v" || /[kmµ]?a$/.test(u) || u === "a";
+      return /[kmµ]?v$/.test(u) || /[kmµ]?a$/.test(u) || /[kmµ]?i$/.test(u);
     });
 
     const voltageIdxs = [], currentIdxs = [];
@@ -103,7 +103,7 @@
     const channels = record.cfg.analogChannels;
     const anyRecognized = channels.some(ch => {
       const u = (ch.units || "").toLowerCase().trim();
-      return /[kmµ]?v$/.test(u) || u === "v" || /[kmµ]?a$/.test(u) || u === "a";
+      return /[kmµ]?v$/.test(u) || /[kmµ]?a$/.test(u) || /[kmµ]?i$/.test(u);
     });
     let voltage = 0, current = 0;
     if (anyRecognized) {
