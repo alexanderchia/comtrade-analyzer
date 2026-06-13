@@ -14,7 +14,9 @@
     pendingDat: null,   // File
     record: null,       // parsed record from Comtrade.parseRecord
     selectedAnalog: new Set(),
-    selectedDigital: new Set()
+    selectedDigital: new Set(),
+    xRange: null,       // shared x-axis range [min, max] for waveform + RMS plots
+    syncingAxes: false  // guard against relayout feedback loops
   };
 
   const PALETTE = [
@@ -172,6 +174,7 @@
       return;
     }
     state.record = record;
+    state.xRange = null;
     state.selectedAnalog = new Set(
       record.analog.map((_, i) => i).slice(0, record.cfg.nAnalog <= 6 ? 6 : 4));
     state.selectedDigital = new Set(
@@ -372,10 +375,21 @@
     const yTitle = perUnit ? "Normalized amplitude"
                  : (units.size === 1 ? [...units][0] : "Value (mixed units)");
 
+    const xRange = state.xRange || [record.time[0], record.time[record.count - 1]];
     Plotly.react(div, traces, darkLayout({
-      xaxis: Object.assign(darkLayout().xaxis, { title: { text: "Time (s)" } }),
+      xaxis: Object.assign(darkLayout().xaxis, { title: { text: "Time (s)" }, range: xRange }),
       yaxis: Object.assign(darkLayout().yaxis, { title: { text: yTitle } })
     }), PLOT_CONFIG);
+
+    div.on("plotly_relayout", data => {
+      if (state.syncingAxes) return;
+      const r = axisRangeFrom(data);
+      if (!r) return;
+      state.xRange = r;
+      state.syncingAxes = true;
+      Plotly.relayout($("rms-plot"), { "xaxis.range[0]": r[0], "xaxis.range[1]": r[1] });
+      state.syncingAxes = false;
+    });
   }
 
   $("per-unit-toggle").addEventListener("change", renderWaveforms);
@@ -433,11 +447,22 @@
     const units = new Set(idxs.map(i => record.cfg.analogChannels[i].units).filter(Boolean));
     const yTitle = units.size === 1 ? `RMS [${[...units][0]}]` : "RMS (mixed units)";
 
+    const xRange = state.xRange || [record.time[0], record.time[record.count - 1]];
     Plotly.react(div, traces, darkLayout({
-      xaxis: Object.assign(darkLayout().xaxis, { title: { text: "Time (s)" } }),
+      xaxis: Object.assign(darkLayout().xaxis, { title: { text: "Time (s)" }, range: xRange }),
       yaxis: Object.assign(darkLayout().yaxis, { title: { text: yTitle } }),
       legend: { orientation: "h", y: 1.12, font: { color: "#c8d2dc" } }
     }), PLOT_CONFIG);
+
+    div.on("plotly_relayout", data => {
+      if (state.syncingAxes) return;
+      const r = axisRangeFrom(data);
+      if (!r) return;
+      state.xRange = r;
+      state.syncingAxes = true;
+      Plotly.relayout($("waveform-plot"), { "xaxis.range[0]": r[0], "xaxis.range[1]": r[1] });
+      state.syncingAxes = false;
+    });
   }
 
   /* ---------------- digital plot ---------------- */
@@ -606,6 +631,17 @@
       });
       tbody.appendChild(tr);
     });
+  }
+
+  /* ---------------- axis sync helper ---------------- */
+
+  function axisRangeFrom(data) {
+    if (data["xaxis.range[0]"] !== undefined && data["xaxis.range[1]"] !== undefined)
+      return [data["xaxis.range[0]"], data["xaxis.range[1]"]];
+    if (data["xaxis.range"] && data["xaxis.range"].length === 2)
+      return data["xaxis.range"];
+    if (data["xaxis.autorange"]) return null; // zoom reset — let both auto-range
+    return null;
   }
 
   /* ---------------- utilities ---------------- */
