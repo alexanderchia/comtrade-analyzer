@@ -369,7 +369,7 @@
       });
       const swatch = document.createElement("span");
       swatch.className = "chan-swatch";
-      swatch.style.background = colorFn(i);
+      swatch.style.background = colorFn(i, ch);
       const name = document.createElement("span");
       name.className = "chan-name";
       name.textContent = ch.name + (ch.phase ? ` (${ch.phase})` : "");
