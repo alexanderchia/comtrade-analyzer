@@ -556,8 +556,9 @@
       });
     });
 
+    const xRange = state.xRange || toDisplayX([record.time[0], record.time[record.count - 1]]);
     Plotly.react(div, traces, darkLayout({
-      xaxis: Object.assign(darkLayout().xaxis, { title: { text: xAxisLabel() } }),
+      xaxis: Object.assign(darkLayout().xaxis, { title: { text: xAxisLabel() }, range: xRange }),
       yaxis: Object.assign(darkLayout().yaxis, {
         tickvals: tickVals, ticktext: tickText,
         range: [-0.6, (idxs.length - 1) * 1.6 + 1.6],
@@ -685,29 +686,31 @@
   }
 
   function setupAxisSync() {
-    const waveDiv = $("waveform-plot");
-    const rmsDiv  = $("rms-plot");
-    const DEBOUNCE = 150;
+    const waveDiv    = $("waveform-plot");
+    const rmsDiv     = $("rms-plot");
+    const digitalDiv = $("digital-plot");
+    const DEBOUNCE   = 150;
 
     waveDiv.removeAllListeners("plotly_relayout");
     rmsDiv.removeAllListeners("plotly_relayout");
+    digitalDiv.removeAllListeners("plotly_relayout");
 
-    waveDiv.on("plotly_relayout", data => {
-      if (Date.now() - state.lastSyncMs < DEBOUNCE) return;
-      const r = axisRangeFrom(data);
-      if (!r) return;
+    function syncOthers(sourceDiv, r) {
       state.xRange = r;
       state.lastSyncMs = Date.now();
-      Plotly.relayout(rmsDiv, { "xaxis.range[0]": r[0], "xaxis.range[1]": r[1] });
-    });
+      const others = [waveDiv, rmsDiv, digitalDiv].filter(d => d !== sourceDiv);
+      others.forEach(d => {
+        if (d.data) Plotly.relayout(d, { "xaxis.range[0]": r[0], "xaxis.range[1]": r[1] });
+      });
+    }
 
-    rmsDiv.on("plotly_relayout", data => {
-      if (Date.now() - state.lastSyncMs < DEBOUNCE) return;
-      const r = axisRangeFrom(data);
-      if (!r) return;
-      state.xRange = r;
-      state.lastSyncMs = Date.now();
-      Plotly.relayout(waveDiv, { "xaxis.range[0]": r[0], "xaxis.range[1]": r[1] });
+    [waveDiv, rmsDiv, digitalDiv].forEach(div => {
+      div.on("plotly_relayout", data => {
+        if (Date.now() - state.lastSyncMs < DEBOUNCE) return;
+        const r = axisRangeFrom(data);
+        if (!r) return;
+        syncOthers(div, r);
+      });
     });
   }
 
