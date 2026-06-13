@@ -329,7 +329,7 @@
       plot_bgcolor: "rgba(0,0,0,0)",
       font: { color: "#9aa7b4", size: 12,
               family: "-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" },
-      margin: { l: 60, r: 20, t: 10, b: 45 },
+      margin: { l: 80, r: 20, t: 10, b: 45 },
       xaxis: { gridcolor: "#222c3a", zerolinecolor: "#2b3442", linecolor: "#2b3442" },
       yaxis: { gridcolor: "#222c3a", zerolinecolor: "#2b3442", linecolor: "#2b3442" },
       legend: { orientation: "h", y: 1.12, font: { color: "#c8d2dc" } },
@@ -564,7 +564,7 @@
         range: [-0.6, (idxs.length - 1) * 1.6 + 1.6],
         zeroline: false, showgrid: false, fixedrange: true
       }),
-      margin: { l: 150, r: 20, t: 10, b: 45 },
+      margin: { l: 80, r: 20, t: 10, b: 45 },
       hovermode: "closest"
     }), PLOT_CONFIG);
   }
