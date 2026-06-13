@@ -16,7 +16,7 @@
     selectedAnalog: new Set(),
     selectedDigital: new Set(),
     xRange: null,       // shared x-axis range [min, max] for waveform + RMS plots
-    syncingAxes: false  // guard against relayout feedback loops
+    lastSyncMs: 0       // timestamp of last axis sync, debounces relayout feedback loops
   };
 
   const PALETTE = [
@@ -627,28 +627,27 @@
   function setupAxisSync() {
     const waveDiv = $("waveform-plot");
     const rmsDiv  = $("rms-plot");
+    const DEBOUNCE = 150;
 
     waveDiv.removeAllListeners("plotly_relayout");
     rmsDiv.removeAllListeners("plotly_relayout");
 
     waveDiv.on("plotly_relayout", data => {
-      if (state.syncingAxes) return;
+      if (Date.now() - state.lastSyncMs < DEBOUNCE) return;
       const r = axisRangeFrom(data);
       if (!r) return;
       state.xRange = r;
-      state.syncingAxes = true;
+      state.lastSyncMs = Date.now();
       Plotly.relayout(rmsDiv, { "xaxis.range[0]": r[0], "xaxis.range[1]": r[1] });
-      state.syncingAxes = false;
     });
 
     rmsDiv.on("plotly_relayout", data => {
-      if (state.syncingAxes) return;
+      if (Date.now() - state.lastSyncMs < DEBOUNCE) return;
       const r = axisRangeFrom(data);
       if (!r) return;
       state.xRange = r;
-      state.syncingAxes = true;
+      state.lastSyncMs = Date.now();
       Plotly.relayout(waveDiv, { "xaxis.range[0]": r[0], "xaxis.range[1]": r[1] });
-      state.syncingAxes = false;
     });
   }
 
