@@ -268,8 +268,11 @@
     state.showPoints = false;
     $("show-points-toggle").checked = false;
     updateCyclesButton();
-    state.selectedAnalog = new Set(
-      record.analog.map((_, i) => i).slice(0, record.cfg.nAnalog <= 6 ? 6 : 4));
+    const vIdxs = record.cfg.analogChannels
+      .map((ch, i) => channelType(ch) === "voltage" ? i : -1).filter(i => i >= 0);
+    const iIdxs = record.cfg.analogChannels
+      .map((ch, i) => channelType(ch) === "current" ? i : -1).filter(i => i >= 0);
+    state.selectedAnalog = new Set([...vIdxs.slice(0, 4), ...iIdxs.slice(0, 4)]);
     state.selectedDigital = new Set(
       record.digital.map((_, i) => i).slice(0, record.cfg.nDigital <= 12 ? 12 : 8));
 
