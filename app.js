@@ -57,7 +57,8 @@
     return PALETTE[i % PALETTE.length];
   };
 
-  const MAX_PLOT_POINTS = 8000; // per analog trace, min/max decimated
+  const MAX_PLOT_POINTS       = 8000; // per trace, lines only
+  const MAX_PLOT_POINTS_MARK  =  500; // per trace, when markers are shown
 
   /* ---------------- channel classification ---------------- */
 
@@ -468,7 +469,7 @@
         for (let k = 0; k < values.length; k++) norm[k] = values[k] / denom;
         values = norm;
       }
-      const d = decimate(record.time, values, MAX_PLOT_POINTS);
+      const d = decimate(record.time, values, state.showPoints ? MAX_PLOT_POINTS_MARK : MAX_PLOT_POINTS);
       return {
         x: toDisplayX(d.x), y: d.y,
         type: "scatter", mode: state.showPoints ? "lines+markers" : "lines",
@@ -566,7 +567,7 @@
       const ch = record.cfg.analogChannels[i];
       const rms = oneCycleRms(record.analog[i], record.sampleRate, lineFreq);
       if (!rms) return null;
-      const d = decimate(timeRms, rms, MAX_PLOT_POINTS);
+      const d = decimate(timeRms, rms, state.showPoints ? MAX_PLOT_POINTS_MARK : MAX_PLOT_POINTS);
       return {
         x: toDisplayX(d.x), y: d.y,
         type: "scatter", mode: state.showPoints ? "lines+markers" : "lines",
