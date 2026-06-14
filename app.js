@@ -128,7 +128,7 @@
   const fileInput = $("file-input");
 
   const PLOT_CONFIG = { responsive: true, displaylogo: false,
-                        modeBarButtonsToRemove: ["lasso2d", "select2d"] };
+                        modeBarButtonsToRemove: ["lasso2d", "select2d", "autoScale2d"] };
 
   /* ---------------- messages ---------------- */
 
