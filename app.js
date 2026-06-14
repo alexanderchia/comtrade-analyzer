@@ -18,7 +18,8 @@
     xRange: null,       // shared x-axis range [min, max] for waveform + RMS plots
     lastSyncMs: 0,      // timestamp of last axis sync, debounces relayout feedback loops
     xInCycles: false,   // when true, time-domain x-axes are shown in cycles instead of seconds
-    showPoints: false   // when true, time-series traces also render markers at sampled points
+    showPoints: false,  // when true, time-series traces also render markers at sampled points
+    reRenderTimer: null // debounce timer for adaptive-resolution re-render after zoom
   };
 
   /* ---------------- x-axis units ---------------- */
@@ -421,6 +422,29 @@
     }, extra);
   }
 
+  /** Returns the current xRange converted to seconds (for filtering record.time). */
+  function visibleRangeSeconds() {
+    if (!state.xRange) return null;
+    const [a, b] = state.xRange;
+    return state.xInCycles ? [a / lineFreq(), b / lineFreq()] : [a, b];
+  }
+
+  /** Slice time+values arrays to the visible x-range, with 1-sample padding each side. */
+  function filterToRange(timeArr, valuesArr) {
+    const r = visibleRangeSeconds();
+    if (!r) return { time: timeArr, values: valuesArr };
+    const [t0, t1] = r;
+    let start = 0, end = timeArr.length - 1;
+    while (start < end && timeArr[start] < t0) start++;
+    while (end > start && timeArr[end] > t1) end--;
+    start = Math.max(0, start - 1);
+    end   = Math.min(timeArr.length - 1, end + 1);
+    return {
+      time:   timeArr.slice   ? timeArr.slice(start, end + 1)   : Array.from(timeArr).slice(start, end + 1),
+      values: valuesArr.slice ? valuesArr.slice(start, end + 1) : Array.from(valuesArr).slice(start, end + 1)
+    };
+  }
+
   /** Min/max decimation that preserves the waveform envelope. */
   function decimate(time, values, maxPoints) {
     const n = values.length;
@@ -469,7 +493,9 @@
         for (let k = 0; k < values.length; k++) norm[k] = values[k] / denom;
         values = norm;
       }
-      const d = decimate(record.time, values, state.showPoints ? MAX_PLOT_POINTS_MARK : MAX_PLOT_POINTS);
+      const filt = filterToRange(record.time, values);
+      const limit = state.showPoints ? MAX_PLOT_POINTS_MARK : MAX_PLOT_POINTS;
+      const d = decimate(filt.time, filt.values, limit);
       return {
         x: toDisplayX(d.x), y: d.y,
         type: "scatter", mode: state.showPoints ? "lines+markers" : "lines",
@@ -567,7 +593,9 @@
       const ch = record.cfg.analogChannels[i];
       const rms = oneCycleRms(record.analog[i], record.sampleRate, lineFreq);
       if (!rms) return null;
-      const d = decimate(timeRms, rms, state.showPoints ? MAX_PLOT_POINTS_MARK : MAX_PLOT_POINTS);
+      const filt = filterToRange(timeRms, rms);
+      const limit = state.showPoints ? MAX_PLOT_POINTS_MARK : MAX_PLOT_POINTS;
+      const d = decimate(filt.time, filt.values, limit);
       return {
         x: toDisplayX(d.x), y: d.y,
         type: "scatter", mode: state.showPoints ? "lines+markers" : "lines",
@@ -797,6 +825,12 @@
       state.lastSyncMs = Date.now();
       allDivs.filter(d => d !== sourceDiv && d.data)
         .forEach(d => Plotly.relayout(d, { "xaxis.range[0]": r[0], "xaxis.range[1]": r[1] }));
+      // Re-render with adaptive resolution after zoom settles
+      clearTimeout(state.reRenderTimer);
+      state.reRenderTimer = setTimeout(() => {
+        renderWaveforms();
+        renderRmsCharts();
+      }, 350);
     }
 
     allDivs.forEach(div => {
