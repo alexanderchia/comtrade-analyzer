@@ -833,10 +833,23 @@
       }, 350);
     }
 
+    function resetAll() {
+      state.xRange = null;
+      state.lastSyncMs = Date.now();
+      clearTimeout(state.reRenderTimer);
+      allDivs.filter(d => d.data)
+        .forEach(d => Plotly.relayout(d, { "xaxis.autorange": true }));
+      state.reRenderTimer = setTimeout(() => {
+        renderWaveforms();
+        renderRmsCharts();
+      }, 350);
+    }
+
     allDivs.forEach(div => {
       if (!div.on) return;
       div.on("plotly_relayout", data => {
         if (Date.now() - state.lastSyncMs < DEBOUNCE) return;
+        if (data["xaxis.autorange"] === true) { resetAll(); return; }
         const r = axisRangeFrom(data);
         if (!r) return;
         syncOthers(div, r);
