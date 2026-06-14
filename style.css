@@ -143,6 +143,14 @@ html, body {
   padding: 0.9rem;
 }
 
+#voltage-waveform-card, #voltage-rms-card {
+  border-left: 4px solid #e3b341;
+}
+
+#current-waveform-card, #current-rms-card {
+  border-left: 4px solid #56d4dd;
+}
+
 .panel h2, .card h2 {
   margin: 0 0 0.6rem;
   font-size: 0.82rem;
