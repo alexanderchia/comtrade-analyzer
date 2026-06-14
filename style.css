@@ -52,7 +52,7 @@ html, body {
 
 .brand { display: flex; align-items: center; gap: 0.6rem; }
 .brand-icon { color: var(--accent); flex: none; }
-.brand h1 { font-size: 1.05rem; font-weight: 600; margin: 0; letter-spacing: 0.02em; }
+.brand h1 { font-size: 2rem; font-weight: 600; margin: 0; letter-spacing: 0.02em; }
 
 .header-meta { display: flex; align-items: center; gap: 0.8rem; }
 .privacy-note { color: var(--text-dim); font-size: 0.78rem; white-space: nowrap; }
