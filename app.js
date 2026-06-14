@@ -338,7 +338,14 @@
       const td1 = document.createElement("td");
       const td2 = document.createElement("td");
       td1.textContent = k;
-      td2.textContent = v;
+      const parts = v.split(",");
+      if (parts.length === 2) {
+        td2.appendChild(document.createTextNode(parts[0]));
+        td2.appendChild(document.createElement("br"));
+        td2.appendChild(document.createTextNode(parts[1]));
+      } else {
+        td2.textContent = v;
+      }
       tr.append(td1, td2);
       table.appendChild(tr);
     }
