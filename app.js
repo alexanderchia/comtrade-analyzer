@@ -189,10 +189,11 @@
     updateSlot("slot-dat", "slot-dat-name", state.pendingDat);
 
     if (rejected.length) {
+      const hasCff = rejected.some(n => n.toLowerCase().endsWith(".cff"));
       showWarning(
         `Ignored unsupported file(s): ${rejected.join(", ")}. ` +
-        `Please provide a .cfg and a .dat file. ` +
-        `(Combined .cff files are not supported — extract the .cfg/.dat pair.)`);
+        `Please provide a .cfg and a .dat file.` +
+        (hasCff ? " Use the CFF section below to load a combined .cff file." : ""));
     }
     if (state.pendingCfg && state.pendingDat) {
       loadPair(state.pendingCfg, state.pendingDat);
@@ -954,6 +955,70 @@
     }
     return { cfgText, datText: rows.join("\n") };
   }
+
+  /* ---------------- CFF loading ---------------- */
+
+  const cffDropZone = $("cff-drop-zone");
+  const cffFileInput = $("cff-file-input");
+
+  async function loadCff(file) {
+    try {
+      clearMessage();
+      updateSlot("slot-cff", "slot-cff-name", file);
+      const buffer = await readAsBuffer(file);
+      const record = Comtrade.parseCff(buffer);
+      record.sourceName = baseName(file.name);
+      presentRecord(record);
+    } catch (err) {
+      console.error(err);
+      showError(err && err.message ? err.message : String(err));
+    }
+  }
+
+  function acceptCff(fileList) {
+    clearMessage();
+    let found = null;
+    const rejected = [];
+    for (const f of fileList) {
+      const ext = (f.name.split(".").pop() || "").toLowerCase();
+      if (ext === "cff") { found = f; break; }
+      else rejected.push(f.name);
+    }
+    if (rejected.length && !found) {
+      showWarning(`Ignored file(s): ${rejected.join(", ")}. Please provide a .cff file.`);
+      return;
+    }
+    if (found) loadCff(found);
+  }
+
+  cffDropZone.addEventListener("click", () => cffFileInput.click());
+  cffDropZone.addEventListener("keydown", e => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cffFileInput.click(); }
+  });
+  $("cff-browse-btn").addEventListener("click", e => {
+    e.stopPropagation();
+    cffFileInput.click();
+  });
+  cffFileInput.addEventListener("change", () => {
+    if (cffFileInput.files.length) acceptCff(cffFileInput.files);
+    cffFileInput.value = "";
+  });
+
+  ["dragenter", "dragover"].forEach(ev =>
+    cffDropZone.addEventListener(ev, e => {
+      e.preventDefault();
+      cffDropZone.classList.add("dragover");
+    }));
+  ["dragleave", "drop"].forEach(ev =>
+    cffDropZone.addEventListener(ev, e => {
+      e.preventDefault();
+      cffDropZone.classList.remove("dragover");
+    }));
+  cffDropZone.addEventListener("drop", e => {
+    if (e.dataTransfer && e.dataTransfer.files.length) acceptCff(e.dataTransfer.files);
+  });
+
+  /* ---------------- demo record ---------------- */
 
   $("demo-btn").addEventListener("click", () => {
     try {

@@ -478,10 +478,73 @@ const Comtrade = (() => {
     return { rms, peak, min, max, mean, freq };
   }
 
+  /* ----------------------------------------------------------
+   * CFF (Combined File Format) — IEEE C37.111-2013
+   * A single .cff file contains CFG and DAT sections delimited
+   * by "--- file type: <NAME> ---" header lines.
+   * ---------------------------------------------------------- */
+
+  function parseCff(buffer) {
+    if (!(buffer instanceof ArrayBuffer)) {
+      throw new ComtradeError("parseCff requires an ArrayBuffer.");
+    }
+    const bytes = new Uint8Array(buffer);
+    const enc = new TextEncoder();
+    const dec = new TextDecoder("utf-8");
+
+    function findBytes(needle, from) {
+      const nb = enc.encode(needle);
+      outer: for (let i = from, end = bytes.length - nb.length; i <= end; i++) {
+        for (let j = 0; j < nb.length; j++) {
+          if (bytes[i + j] !== nb[j]) continue outer;
+        }
+        return i;
+      }
+      return -1;
+    }
+
+    // Returns byte offset of first content byte after the named section header.
+    function sectionStart(name, from) {
+      const marker = `--- file type: ${name} ---`;
+      const off = findBytes(marker, from);
+      if (off === -1) return -1;
+      let end = off + marker.length;
+      if (bytes[end] === 0x0D && bytes[end + 1] === 0x0A) end += 2;
+      else if (bytes[end] === 0x0A) end += 1;
+      return end;
+    }
+
+    const cfgStart = sectionStart("CFG", 0);
+    if (cfgStart === -1) {
+      throw new ComtradeError(
+        "Not a valid CFF file: missing '--- file type: CFG ---' section header.");
+    }
+
+    const datMarkerOff = findBytes("--- file type: DAT ---", cfgStart);
+    if (datMarkerOff === -1) {
+      throw new ComtradeError("CFF file: missing '--- file type: DAT ---' section header.");
+    }
+    const datStart = sectionStart("DAT", datMarkerOff);
+
+    const cfgText = dec.decode(bytes.slice(cfgStart, datMarkerOff));
+    const cfg = parseCfg(cfgText);
+
+    // DAT ends at the next section marker or EOF
+    const nextMarkerOff = findBytes("--- file type:", datStart);
+    const datEnd = nextMarkerOff === -1 ? bytes.length : nextMarkerOff;
+
+    const datContent = cfg.fileType === "ASCII"
+      ? dec.decode(bytes.slice(datStart, datEnd))
+      : buffer.slice(datStart, datEnd);
+
+    return parseRecord(cfg, datContent);
+  }
+
   return {
     ComtradeError,
     parseCfg,
     parseRecord,
-    channelStats
+    channelStats,
+    parseCff
   };
 })();

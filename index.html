@@ -35,7 +35,7 @@
   <aside class="sidebar">
 
     <section class="panel">
-      <h2>Load Record</h2>
+      <h2>Load CFG + DAT</h2>
       <div id="drop-zone" class="drop-zone" tabindex="0">
         <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true">
           <path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
@@ -57,6 +57,28 @@
         </div>
       </div>
       <button id="demo-btn" class="btn ghost full" type="button">Load demo record (synthetic fault)</button>
+    </section>
+
+    <div class="load-or">or</div>
+
+    <section class="panel">
+      <h2>Load CFF File</h2>
+      <div id="cff-drop-zone" class="drop-zone" tabindex="0">
+        <svg viewBox="0 0 24 24" width="34" height="34" aria-hidden="true">
+          <path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"
+                d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 16.5V19a1.5 1.5 0 0 0 1.5 1.5h13A1.5 1.5 0 0 0 20 19v-2.5"/>
+        </svg>
+        <p>Drag &amp; drop your <strong>.cff</strong> file here</p>
+        <p class="muted">or</p>
+        <button id="cff-browse-btn" class="btn primary" type="button">Browse file&hellip;</button>
+        <input id="cff-file-input" type="file" accept=".cff,.CFF" class="hidden">
+      </div>
+      <div class="file-slots">
+        <div class="file-slot" id="slot-cff">
+          <span class="slot-label">CFF</span>
+          <span class="slot-name" id="slot-cff-name">waiting&hellip;</span>
+        </div>
+      </div>
     </section>
 
     <section class="panel hidden" id="record-info-panel">

@@ -207,6 +207,20 @@ html, body {
   color: var(--text);
 }
 
+.load-or {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-dim);
+  font-size: 0.78rem;
+  margin: -0.3rem 0;
+}
+.load-or::before, .load-or::after {
+  content: "";
+  flex: 1;
+  border-top: 1px solid var(--border);
+}
+
 .file-slots { display: flex; gap: 0.5rem; margin-top: 0.6rem; }
 
 .file-slot {
