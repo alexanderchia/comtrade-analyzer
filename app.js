@@ -727,9 +727,31 @@
     const i = parseInt($("fft-channel").value || "0", 10);
     const ch = record.cfg.analogChannels[i];
 
+    // Extract a 1-cycle window centered on the midpoint of the current view.
+    const lf = lineFreq();
+    const cycleN = Math.round(record.sampleRate / lf);
+
+    const visRange = visibleRangeSeconds();
+    let centerSec = visRange
+      ? (visRange[0] + visRange[1]) / 2
+      : record.time[Math.floor(record.count / 2)];
+    centerSec = Math.max(record.time[0], Math.min(record.time[record.count - 1], centerSec));
+
+    // Binary search for the sample closest to centerSec.
+    let lo = 0, hi = record.count - 1;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (record.time[mid] < centerSec) lo = mid + 1; else hi = mid; }
+    if (lo > 0 && Math.abs(record.time[lo - 1] - centerSec) < Math.abs(record.time[lo] - centerSec)) lo--;
+    const centerIdx = lo;
+
+    const half = Math.floor(cycleN / 2);
+    const winStart = Math.max(0, Math.min(record.count - cycleN, centerIdx - half));
+    const winEnd = Math.min(record.count, winStart + cycleN);
+    const cycleSignal = record.analog[i].slice(winStart, winEnd);
+    const winCenterSec = record.time[Math.floor((winStart + winEnd - 1) / 2)];
+
     let spec;
     try {
-      spec = FFT.amplitudeSpectrum(record.analog[i], record.sampleRate);
+      spec = FFT.amplitudeSpectrum(cycleSignal, record.sampleRate);
     } catch (err) {
       Plotly.purge(div); div.innerHTML = "";
       note.textContent = "FFT unavailable: " + err.message;
@@ -767,9 +789,9 @@
 
     const df = record.sampleRate / spec.n;
     note.textContent =
+      `1-cycle window · centre at ${fmt(winCenterSec * 1000, 5)} ms · ` +
       `Hann window · ${spec.n}-point FFT @ ${fmt(record.sampleRate, 6)} Hz · ` +
-      `resolution ${fmt(df, 4)} Hz · Nyquist ${fmt(nyquist, 6)} Hz` +
-      (spec.n < record.count ? ` · analysed first ${spec.n} of ${record.count} samples` : "");
+      `resolution ${fmt(df, 4)} Hz · Nyquist ${fmt(nyquist, 6)} Hz`;
   }
 
   $("fft-channel").addEventListener("change", renderFft);
@@ -838,6 +860,7 @@
       state.reRenderTimer = setTimeout(() => {
         renderWaveforms();
         renderRmsCharts();
+        renderFft();
       }, 350);
     }
 
@@ -850,6 +873,7 @@
       state.reRenderTimer = setTimeout(() => {
         renderWaveforms();
         renderRmsCharts();
+        renderFft();
       }, 350);
     }
 
