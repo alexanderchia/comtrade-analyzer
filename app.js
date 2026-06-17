@@ -481,6 +481,23 @@
 
   /* ---------------- waveform plot ---------------- */
 
+  // Returns Plotly shapes/annotations for the trigger marker, in current display units.
+  function triggerExtras() {
+    const record = state.record;
+    if (!record || !Number.isFinite(record.triggerOffset)) return {};
+    const tx = state.xInCycles ? record.triggerOffset * lineFreq() : record.triggerOffset;
+    return {
+      shapes: [{
+        type: "line", x0: tx, x1: tx, y0: 0, y1: 1, yref: "paper",
+        line: { color: "#d29922", width: 1.5, dash: "dot" }
+      }],
+      annotations: [{
+        x: tx, y: 1, yref: "paper", text: "T", showarrow: false,
+        font: { color: "#d29922", size: 10 }, xanchor: "left", yanchor: "top"
+      }]
+    };
+  }
+
   function renderWaveformChart(plotDivId, emptyHintId, channelIdxs) {
     const record = state.record;
     if (!record) return;
@@ -521,10 +538,10 @@
 
     const xRange = state.xRange ||
       toDisplayX([record.time[0], record.time[record.count - 1]]);
-    Plotly.react(div, traces, darkLayout({
+    Plotly.react(div, traces, darkLayout(Object.assign({
       xaxis: Object.assign(darkLayout().xaxis, { title: { text: xAxisLabel() }, range: xRange }),
       yaxis: Object.assign(darkLayout().yaxis, { title: { text: yTitle } })
-    }), PLOT_CONFIG);
+    }, triggerExtras())), PLOT_CONFIG);
   }
 
   // Wrapper: split current selection into voltage/current and render both charts.
@@ -622,11 +639,11 @@
 
     const xRange = state.xRange ||
       toDisplayX([record.time[0], record.time[record.count - 1]]);
-    Plotly.react(div, traces, darkLayout({
+    Plotly.react(div, traces, darkLayout(Object.assign({
       xaxis: Object.assign(darkLayout().xaxis, { title: { text: xAxisLabel() }, range: xRange }),
       yaxis: Object.assign(darkLayout().yaxis, { title: { text: yTitle } }),
       legend: { orientation: "h", y: 1.12, font: { color: "#c8d2dc" } }
-    }), PLOT_CONFIG);
+    }, triggerExtras())), PLOT_CONFIG);
   }
 
   // Wrapper: split current selection into voltage/current and render both RMS charts.
@@ -696,7 +713,8 @@
         zeroline: false, showgrid: false, fixedrange: true
       }),
       margin: { l: 80, r: 20, t: 10, b: 45 },
-      hovermode: "closest"
+      hovermode: "closest",
+      ...triggerExtras()
     }), PLOT_CONFIG);
   }
 

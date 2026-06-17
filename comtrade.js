@@ -202,6 +202,19 @@ const Comtrade = (() => {
   }
 
   /* ----------------------------------------------------------
+   * Timestamp helpers
+   * ---------------------------------------------------------- */
+
+  // Parse a Comtrade timestamp string "dd/mm/yyyy,hh:mm:ss.ssssss" → seconds (Unix epoch).
+  function parseTimestamp(s) {
+    if (!s) return NaN;
+    const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4}),(\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?$/.exec(s.trim());
+    if (!m) return NaN;
+    const fracSec = m[7] ? parseFloat("0." + m[7]) : 0;
+    return Date.UTC(+m[3], +m[2] - 1, +m[1], +m[4], +m[5], +m[6]) / 1000 + fracSec;
+  }
+
+  /* ----------------------------------------------------------
    * Time axis from CFG sample-rate table
    * ---------------------------------------------------------- */
 
@@ -416,6 +429,13 @@ const Comtrade = (() => {
       }
     }
 
+    // Trigger offset: seconds from first sample to trigger event.
+    const tsStart = parseTimestamp(cfg.startTime);
+    const tsTrig  = parseTimestamp(cfg.triggerTime);
+    const triggerOffset = (Number.isFinite(tsStart) && Number.isFinite(tsTrig) && tsTrig >= tsStart)
+      ? tsTrig - tsStart
+      : NaN;
+
     return {
       cfg,
       count: data.count,
@@ -424,6 +444,7 @@ const Comtrade = (() => {
       digital: data.digital,      // Uint8Array per channel
       sampleRate: effectiveRate,  // Hz
       duration: data.count > 1 ? time[data.count - 1] - time[0] : 0,
+      triggerOffset,              // seconds from first sample, NaN if unavailable
       warnings
     };
   }
