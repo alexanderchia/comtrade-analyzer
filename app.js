@@ -684,7 +684,7 @@
     $("digital-empty").classList.toggle("hidden", idxs.length > 0);
     if (idxs.length === 0) { Plotly.purge(div); div.innerHTML = ""; return; }
 
-    div.style.height = Math.max(180, 70 + idxs.length * 42) + "px";
+    div.style.height = Math.max(180, 70 + idxs.length * 75) + "px";
 
     const time = record.time;
     const last = record.count - 1;
@@ -694,7 +694,7 @@
     idxs.forEach((chIdx, row) => {
       const ch = record.cfg.digitalChannels[chIdx];
       const v = record.digital[chIdx];
-      const offset = (idxs.length - 1 - row) * 1.6;
+      const offset = (idxs.length - 1 - row) * 3.0;
       tickVals.push(offset + 0.5);
       tickText.push(ch.name);
 
@@ -725,7 +725,7 @@
       xaxis: Object.assign(darkLayout().xaxis, { title: { text: xAxisLabel() }, range: xRange }),
       yaxis: Object.assign(darkLayout().yaxis, {
         tickvals: tickVals, ticktext: tickText,
-        range: [-0.6, (idxs.length - 1) * 1.6 + 1.6],
+        range: [-0.6, (idxs.length - 1) * 3.0 + 3.0],
         zeroline: false, showgrid: false, fixedrange: true
       }),
       margin: { l: 80, r: 20, t: 10, b: 45 },
