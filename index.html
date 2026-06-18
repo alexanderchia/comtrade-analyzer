@@ -154,7 +154,10 @@
       </section>
 
       <section class="card" id="phasor-card">
-        <div class="card-head"><h2>Phasors — 1-cycle window</h2></div>
+        <div class="card-head">
+          <h2>Phasors — 1-cycle window</h2>
+          <p class="muted small" style="margin:0">Pan or zoom the waveform charts to move the window</p>
+        </div>
         <div class="phasor-plots">
           <div id="voltage-phasor-plot" class="phasor-plot"></div>
           <div id="current-phasor-plot" class="phasor-plot"></div>
@@ -170,7 +173,10 @@
 
       <section class="card">
         <div class="card-head">
-          <h2>Frequency Spectrum — 1-cycle window</h2>
+          <div>
+            <h2>Frequency Spectrum — 1-cycle window</h2>
+            <p class="muted small" style="margin:0">Pan or zoom the waveform charts to move the window</p>
+          </div>
           <div class="fft-controls">
             <select id="fft-channel" aria-label="FFT channel"></select>
             <label class="toggle"><input type="checkbox" id="fft-log"> Log magnitude</label>
