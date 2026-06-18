@@ -309,6 +309,7 @@
     setupAxisSync();
     populateFftChannels(record);
     renderFft();
+    renderPhasors();
     renderStats(record);
   }
 
@@ -356,7 +357,7 @@
   function renderChannelLists(record) {
     buildChannelList($("analog-list"), record.cfg.analogChannels, state.selectedAnalog,
       (i, ch) => `${ch.units || ""}`, (i, ch) => analogColor(i, ch),
-      () => { renderWaveforms(); renderRmsCharts(); });
+      () => { renderWaveforms(); renderRmsCharts(); renderPhasors(); });
     $("analog-panel").classList.toggle("hidden", record.cfg.nAnalog === 0);
 
     buildChannelList($("digital-list"), record.cfg.digitalChannels, state.selectedDigital,
@@ -402,11 +403,11 @@
   }
   $("analog-all").addEventListener("click", () => {
     setAll(state.selectedAnalog, state.record.cfg.nAnalog, true, "analog-list", renderWaveforms);
-    renderRmsCharts();
+    renderRmsCharts(); renderPhasors();
   });
   $("analog-none").addEventListener("click", () => {
     setAll(state.selectedAnalog, state.record.cfg.nAnalog, false, "analog-list", renderWaveforms);
-    renderRmsCharts();
+    renderRmsCharts(); renderPhasors();
   });
   $("digital-all").addEventListener("click", () =>
     setAll(state.selectedDigital, state.record.cfg.nDigital, true, "digital-list", renderDigital));
@@ -480,6 +481,21 @@
   }
 
   /* ---------------- waveform plot ---------------- */
+
+  // Compute the fundamental-frequency phasor from a 1-cycle signal slice.
+  // Returns { mag (RMS), angleDeg }.
+  function computePhasor(signal, cycleN) {
+    const N = Math.min(cycleN, signal.length);
+    let re = 0, im = 0;
+    for (let n = 0; n < N; n++) {
+      const theta = 2 * Math.PI * n / cycleN;
+      re += signal[n] * Math.cos(theta);
+      im -= signal[n] * Math.sin(theta); // DFT uses e^(-j2π...)
+    }
+    re = 2 * re / N;
+    im = 2 * im / N;
+    return { mag: Math.hypot(re, im) / Math.SQRT2, angleDeg: Math.atan2(im, re) * 180 / Math.PI };
+  }
 
   // Returns Plotly shapes/annotations for the trigger marker, in current display units.
   function triggerExtras() {
@@ -816,6 +832,116 @@
   $("fft-log").addEventListener("change", renderFft);
   $("fft-zoom").addEventListener("change", renderFft);
 
+  /* ---------------- phasor diagram ---------------- */
+
+  function renderPhasors() {
+    const record = state.record;
+    if (!record) return;
+
+    const { voltageIdxs, currentIdxs } = splitSelectedAnalog();
+    const card = $("phasor-card");
+    if (voltageIdxs.length === 0 && currentIdxs.length === 0) {
+      card.classList.add("hidden"); return;
+    }
+    card.classList.remove("hidden");
+
+    // Same 1-cycle window as FFT.
+    const lf = lineFreq();
+    const cycleN = Math.round(record.sampleRate / lf);
+    const visRange = visibleRangeSeconds();
+    let centerSec = visRange
+      ? (visRange[0] + visRange[1]) / 2
+      : record.time[Math.floor(record.count / 2)];
+    centerSec = Math.max(record.time[0], Math.min(record.time[record.count - 1], centerSec));
+
+    let lo = 0, hi = record.count - 1;
+    while (lo < hi) { const mid = (lo + hi) >> 1; if (record.time[mid] < centerSec) lo = mid + 1; else hi = mid; }
+    if (lo > 0 && Math.abs(record.time[lo - 1] - centerSec) < Math.abs(record.time[lo] - centerSec)) lo--;
+    const half = Math.floor(cycleN / 2);
+    const winStart = Math.max(0, Math.min(record.count - cycleN, lo - half));
+    const winEnd   = Math.min(record.count, winStart + cycleN);
+    const winCenterSec = record.time[Math.floor((winStart + winEnd - 1) / 2)];
+
+    // Reference angle: phase A voltage (or first voltage channel).
+    let refAngleDeg = 0;
+    if (voltageIdxs.length > 0) {
+      const refIdx = voltageIdxs.find(i => {
+        const ch = record.cfg.analogChannels[i];
+        const src = (ch.phase && ch.phase.trim()) ? ch.phase.trim() : (ch.name || "");
+        return src.toUpperCase().slice(-1) === "A";
+      }) ?? voltageIdxs[0];
+      refAngleDeg = computePhasor(record.analog[refIdx].slice(winStart, winEnd), cycleN).angleDeg;
+    }
+
+    function buildTraces(idxs) {
+      return idxs.map(i => {
+        const ch = record.cfg.analogChannels[i];
+        const { mag, angleDeg } = computePhasor(record.analog[i].slice(winStart, winEnd), cycleN);
+        const angle = angleDeg - refAngleDeg;
+        const color = analogColor(i, ch);
+        return {
+          type: "scatterpolar",
+          r: [0, mag], theta: [0, angle],
+          mode: "lines+markers",
+          name: ch.name,
+          line: { color, width: 2.5 },
+          marker: { size: [0, 7], color: [color, color] },
+          hovertemplate: `${fmt(mag, 4)}${ch.units ? " " + ch.units : ""} ∠ ${fmt(angle, 4)}°` +
+            `<extra>${escapeHtml(ch.name)}</extra>`
+        };
+      });
+    }
+
+    const polarLayout = title => ({
+      paper_bgcolor: "rgba(0,0,0,0)",
+      font: { color: "#9aa7b4", size: 11,
+              family: "-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, sans-serif" },
+      polar: {
+        bgcolor: "rgba(0,0,0,0)",
+        angularaxis: {
+          direction: "counterclockwise", rotation: 0,
+          tickmode: "array",
+          tickvals: [0, 30, 60, 90, 120, 150, 180, 210, 240, 270, 300, 330],
+          ticktext: ["0°","30°","60°","90°","120°","150°","±180°","-150°","-120°","-90°","-60°","-30°"],
+          gridcolor: "#222c3a", linecolor: "#2b3442",
+          tickfont: { color: "#9aa7b4", size: 9 }
+        },
+        radialaxis: {
+          gridcolor: "#222c3a", linecolor: "#2b3442",
+          tickfont: { color: "#9aa7b4", size: 9 }
+        }
+      },
+      title: { text: title, font: { color: "#9aa7b4", size: 11 }, x: 0.5 },
+      showlegend: true,
+      legend: { font: { color: "#c8d2dc", size: 10 }, bgcolor: "rgba(0,0,0,0)",
+                orientation: "h", y: -0.08 },
+      margin: { l: 55, r: 55, t: 35, b: 20 }
+    });
+
+    const cfg = { responsive: true, displaylogo: false };
+    const vDiv = $("voltage-phasor-plot");
+    const iDiv = $("current-phasor-plot");
+
+    const unitsLabel = idxs => {
+      const u = [...new Set(idxs.map(i => record.cfg.analogChannels[i].units).filter(Boolean))];
+      return u.length === 1 ? ` (${u[0]})` : "";
+    };
+
+    if (voltageIdxs.length > 0) {
+      Plotly.react(vDiv, buildTraces(voltageIdxs), polarLayout(`Voltage${unitsLabel(voltageIdxs)}`), cfg);
+    } else {
+      Plotly.purge(vDiv); vDiv.innerHTML = "";
+    }
+    if (currentIdxs.length > 0) {
+      Plotly.react(iDiv, buildTraces(currentIdxs), polarLayout(`Current${unitsLabel(currentIdxs)}`), cfg);
+    } else {
+      Plotly.purge(iDiv); iDiv.innerHTML = "";
+    }
+
+    $("phasor-note").textContent =
+      `1-cycle window · centre at ${fmt(winCenterSec * 1000, 5)} ms · VA fixed at 0°`;
+  }
+
   /* ---------------- statistics table ---------------- */
 
   function renderStats(record) {
@@ -879,6 +1005,7 @@
         renderWaveforms();
         renderRmsCharts();
         renderFft();
+        renderPhasors();
       }, 350);
     }
 
@@ -892,6 +1019,7 @@
         renderWaveforms();
         renderRmsCharts();
         renderFft();
+        renderPhasors();
       }, 350);
     }
 
