@@ -2,6 +2,11 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Git workflow
+
+- Commit and push to `dev` only by default.
+- Only merge `dev` into `main` and push `main` when the user explicitly asks — `main` is the live GitHub Pages branch.
+
 ## Running the app
 
 No build step or server required. Open `index.html` directly in a browser:
